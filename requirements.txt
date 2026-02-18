@@ -10,3 +10,6 @@ numpy>=1.24.0
 # FastAPI (for api_app.py)
 fastapi>=0.104.0
 uvicorn[standard]>=0.24.0
+
+# Streamlit UI (for streamlit_ui.py)
+streamlit>=1.28.0

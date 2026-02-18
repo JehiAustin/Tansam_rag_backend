@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>🎓 AI Academic Advisor</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        
+        .container {
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            padding: 40px;
+            max-width: 800px;
+            width: 90%;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .header h1 {
+            color: #1f77b4;
+            font-size: 2.5rem;
+            margin-bottom: 10px;
+        }
+        
+        .status-bar {
+            background: #f8f9fa;
+            border-radius: 10px;
+            padding: 15px;
+            margin-bottom: 30px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-online {
+            color: #28a745;
+            font-weight: bold;
+        }
+        
+        .status-offline {
+            color: #dc3545;
+            font-weight: bold;
+        }
+        
+        .chat-container {
+            background: #f8f9fa;
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 20px;
+            max-height: 400px;
+            overflow-y: auto;
+        }
+        
+        .message {
+            margin-bottom: 15px;
+            padding: 15px;
+            border-radius: 10px;
+            max-width: 80%;
+        }
+        
+        .user-message {
+            background: #007bff;
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+        
+        .bot-message {
+            background: #e9ecef;
+            color: #333;
+            margin-right: auto;
+        }
+        
+        .input-container {
+            display: flex;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .question-input {
+            flex: 1;
+            padding: 15px;
+            border: 2px solid #dee2e6;
+            border-radius: 10px;
+            font-size: 16px;
+            transition: border-color 0.3s;
+        }
+        
+        .question-input:focus {
+            outline: none;
+            border-color: #007bff;
+        }
+        
+        .ask-button {
+            background: #007bff;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            border-radius: 10px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .ask-button:hover {
+            background: #0056b3;
+        }
+        
+        .ask-button:disabled {
+            background: #6c757d;
+            cursor: not-allowed;
+        }
+        
+        .loading {
+            text-align: center;
+            padding: 20px;
+            color: #666;
+        }
+        
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            color: #666;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🎓 AI Academic Advisor</h1>
+            <p>Ask questions about academic programs, fees, admission, and more!</p>
+        </div>
+        
+        <div class="status-bar">
+            <div class="status-item">
+                <span id="api-status">🔄 Checking...</span>
+            </div>
+            <div class="status-item">
+                <span id="stats-info">📊 Loading...</span>
+            </div>
+        </div>
+        
+        <div class="chat-container" id="chat-container">
+            <div class="loading" id="loading">
+                💬 Start a conversation by asking a question below...
+            </div>
+        </div>
+        
+        <div class="input-container">
+            <input 
+                type="text" 
+                id="question-input" 
+                class="question-input" 
+                placeholder="e.g., What is the fee structure for engineering programs?"
+                maxlength="500"
+            >
+            <button id="ask-button" class="ask-button" onclick="askQuestion()">
+                🚀 Ask
+            </button>
+        </div>
+        
+        <div class="footer">
+            <p>💡 <strong>Tip:</strong> Repeat questions get instant cached responses!</p>
+            <p>🤖 Powered by RAG + LLM | API: <code>http://127.0.0.1:8000</code></p>
+        </div>
+    </div>
+
+    <script>
+        const API_BASE = 'http://127.0.0.1:8000';
+        let chatHistory = [];
+        
+        // Check API status on load
+        async function checkStatus() {
+            try {
+                const response = await fetch(`${API_BASE}/health`);
+                const data = await response.json();
+                
+                document.getElementById('api-status').innerHTML = 
+                    data.rag_ready && data.llm_ready ? 
+                    '✅ <span class="status-online">API Online</span>' : 
+                    '⚠️ <span class="status-offline">API Partial</span>';
+                
+                // Load stats
+                const statsResponse = await fetch(`${API_BASE}/stats`);
+                if (statsResponse.ok) {
+                    const stats = await statsResponse.json();
+                    document.getElementById('stats-info').innerHTML = 
+                        `📊 ${stats.documents || 0} docs | ${stats.cached_embeddings || 0} embeddings`;
+                }
+            } catch (error) {
+                document.getElementById('api-status').innerHTML = 
+                    '❌ <span class="status-offline">API Offline</span>';
+            }
+        }
+        
+        // Ask question function
+        async function askQuestion() {
+            const input = document.getElementById('question-input');
+            const button = document.getElementById('ask-button');
+            const question = input.value.trim();
+            
+            if (!question) {
+                alert('Please enter a question!');
+                return;
+            }
+            
+            // Disable input and button
+            input.disabled = true;
+            button.disabled = true;
+            button.innerHTML = '🤔 Thinking...';
+            
+            // Add user message
+            addMessage(question, 'user');
+            
+            try {
+                const response = await fetch(`${API_BASE}/chat`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ question })
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    addMessage(data.answer, 'bot', data.status);
+                } else {
+                    addMessage(`❌ Error: ${data.detail || 'Unknown error'}`, 'bot', 'error');
+                }
+            } catch (error) {
+                addMessage(`❌ Connection Error: ${error.message}`, 'bot', 'error');
+            }
+            
+            // Re-enable input and button
+            input.disabled = false;
+            button.disabled = false;
+            button.innerHTML = '🚀 Ask';
+            input.value = '';
+            input.focus();
+        }
+        
+        // Add message to chat
+        function addMessage(content, sender, status = '') {
+            const container = document.getElementById('chat-container');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${sender}-message`;
+            
+            const statusIcon = {
+                'success': '✅',
+                'cached': '⚡',
+                'fallback': '⚠️',
+                'error': '❌'
+            }[status] || '🤖';
+            
+            const timestamp = new Date().toLocaleTimeString();
+            
+            if (sender === 'user') {
+                messageDiv.innerHTML = `<strong>👤 You (${timestamp}):</strong><br>${content}`;
+            } else {
+                messageDiv.innerHTML = `<strong>🤖 AI Advisor (${statusIcon} ${status}):</strong><br>${content}`;
+            }
+            
+            container.appendChild(messageDiv);
+            container.scrollTop = container.scrollHeight;
+            
+            // Remove loading message if it exists
+            const loading = document.getElementById('loading');
+            if (loading) {
+                loading.remove();
+            }
+        }
+        
+        // Handle Enter key
+        document.getElementById('question-input').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                askQuestion();
+            }
+        });
+        
+        // Initialize
+        checkStatus();
+        setInterval(checkStatus, 30000); // Check status every 30 seconds
+    </script>
+</body>
+</html>
