@@ -127,7 +127,7 @@ with st.sidebar:
     health_ok, health_data = check_api_health()
     if health_ok:
         st.markdown('<div class="status-indicator success">✅ API Online</div>', unsafe_allow_html=True)
-        st.write(f"**RAG Ready:** {health_data.get('rag_ready', False)}")
+        st.write(f"**System Ready:** {health_data.get('rag_ready', False)}")
         st.write(f"**LLM Ready:** {health_data.get('llm_ready', False)}")
     else:
         st.markdown('<div class="status-indicator error">❌ API Offline</div>', unsafe_allow_html=True)
@@ -147,23 +147,29 @@ with st.sidebar:
 # Main chat interface
 st.header("💬 Ask Questions")
 
-# Initialize chat history
+# Initialize session state for question preservation
 if 'chat_history' not in st.session_state:
     st.session_state.chat_history = []
-
-# Initialize session state for question preservation
-if 'current_question' not in st.session_state:
-    st.session_state.current_question = ""
+if 'question_value' not in st.session_state:
+    st.session_state.question_value = ""
+if 'clear_input' not in st.session_state:
+    st.session_state.clear_input = False
 
 def submit_question():
     """Handle question submission callback."""
     if st.session_state.question_input.strip():
-        st.session_state.current_question = st.session_state.question_input
+        st.session_state.question_value = st.session_state.question_input
         st.session_state.submit_question = True
+        st.session_state.clear_input = True
 
-# Question input - preserves text after Enter
+# Question input - preserves text during processing
 col1, col2 = st.columns([5, 1])
 with col1:
+    # Use clear_input flag to reset the text input
+    if st.session_state.clear_input:
+        st.session_state.question_input = ""
+        st.session_state.clear_input = False
+    
     question = st.text_input(
         "Ask about academic programs, fees, admission, etc...",
         placeholder="e.g., What is fee structure?",
@@ -176,12 +182,12 @@ with col2:
 
 # Handle question submission - works with both Enter key and button click
 if (ask_button and question) or ('submit_question' in st.session_state and st.session_state.submit_question):
-    # Clear the submit flag
+    # Clear submit flag
     if 'submit_question' in st.session_state:
         del st.session_state.submit_question
     
-    # Use the current question
-    actual_question = st.session_state.current_question if 'current_question' in st.session_state else question
+    # Use current question
+    actual_question = st.session_state.question_value if 'question_value' in st.session_state else question
     
     with st.spinner("🤔 Thinking..."):
         success, result = ask_question(actual_question)
@@ -200,7 +206,8 @@ if (ask_button and question) or ('submit_question' in st.session_state and st.se
         st.error(f"❌ Error: {result.get('error', 'Unknown error')}")
     
     # Clear current question for next input
-    st.session_state.current_question = ""
+    st.session_state.question_value = ""
+    st.session_state.clear_input = True
 
 # Display chat history
 if st.session_state.chat_history:
@@ -230,12 +237,12 @@ if st.session_state.chat_history:
             'cached': '⚡',
             'fallback': '⚠️',
             'error': '❌'
-        }.get(chat['status'], '❓')
+        }.get(chat['status'], '')
         
         st.markdown(f'''
         <div style="display: flex; justify-content: flex-start; margin-bottom: 1rem;">
             <div class="bot-message" style="max-width: 70%; display: inline-block;">
-                <strong>🤖 AI Advisor ({status_icon} {chat['status']}):</strong><br>
+                <strong>🤖 AI Advisor ({status_icon}):</strong><br>
                 {chat['answer']}
             </div>
         </div>
@@ -253,7 +260,7 @@ if st.session_state.chat_history:
 st.markdown("---")
 st.markdown("""
 <div style='text-align: center; color: #666;'>
-    <p>🎓 AI Academic Advisor | Powered by RAG + LLM</p>
+    <p>🎓 AI Academic Advisor | Powered by LLM</p>
     <p>💡 Tip: Repeat questions get instant cached responses!</p>
 </div>
 """, unsafe_allow_html=True)
