@@ -24,6 +24,9 @@ def main():
 
     print("Loading RAG from", data_path, "...")
     rag = create_rag_service(data_path=data_path)
+#     rag = create_rag_service(sources=[
+#     {"url": "http://127.0.0.1:8000/items", "method": "GET"}
+# ])
     llm = create_llm_service("qwen2.5:3b", backend="ollama")
 
     print("Ready. Commands: /stats  /search <query>  /help  quit")
